@@ -1,0 +1,592 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Проверка счетов-фактур 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --g950:#06291e; --g900:#0b3d2e; --g800:#0f5132; --g700:#146c43; --g600:#198754;
+  --g500:#22a06b; --g300:#7fd1a8; --g200:#bfe8d2; --g100:#e3f5ea; --g50:#f3faf6;
+  --text:#11241c; --muted:#5b7368; --line:#d5e8dd; --card:#ffffff;
+  --err:#c0392b; --err-bg:#fdecea; --warn:#b7791f; --warn-bg:#fff6e0; --ok:#198754; --ok-bg:#e3f5ea;
+  --radius:16px; --shadow:0 6px 24px rgba(11,61,46,.08);
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:Manrope,system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--g50);color:var(--text);line-height:1.5}
+a{color:var(--g700)}
+.wrap{max-width:1240px;margin:0 auto;padding:0 16px}
+
+/* Header */
+header.hero{background:linear-gradient(135deg,var(--g950),var(--g800) 55%,var(--g600));color:#fff;padding:28px 0 64px}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px;font-weight:800;font-size:18px}
+.logo{width:40px;height:40px;border-radius:12px;background:rgba(255,255,255,.14);display:grid;place-items:center}
+.badge-year{background:var(--g300);color:var(--g950);font-weight:800;padding:4px 12px;border-radius:999px;font-size:13px}
+.hero h1{font-size:clamp(26px,4vw,40px);margin:36px 0 8px;line-height:1.15}
+.hero p{margin:0;max-width:720px;color:var(--g200);font-size:16px}
+
+main{margin-top:-40px;padding-bottom:48px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:22px;margin-bottom:20px}
+.card h2{margin:0 0 4px;font-size:19px;color:var(--g900);display:flex;align-items:center;gap:10px}
+.step{width:28px;height:28px;border-radius:50%;background:var(--g100);color:var(--g700);display:inline-grid;place-items:center;font-size:14px;font-weight:800;flex:none}
+.sub{color:var(--muted);margin:0 0 16px;font-size:14px}
+
+/* Upload */
+.grid-up{display:grid;grid-template-columns:2fr 1fr;gap:20px}
+@media (max-width:860px){.grid-up{grid-template-columns:1fr}}
+.drop{border:2px dashed var(--g300);border-radius:14px;background:var(--g50);padding:34px 16px;text-align:center;cursor:pointer;transition:.15s}
+.drop:hover,.drop.over{background:var(--g100);border-color:var(--g500)}
+.drop svg{color:var(--g600)}
+.drop b{display:block;font-size:17px;margin:8px 0 2px;color:var(--g900)}
+.drop span{color:var(--muted);font-size:14px}
+.file-info{margin-top:12px;font-size:14px;color:var(--g800);font-weight:600;min-height:21px}
+.settings label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin:0 0 4px}
+.settings .row{margin-bottom:12px}
+input[type=number],input[type=text],select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font:inherit;font-size:14px;background:#fff;color:var(--text)}
+input:focus,select:focus{outline:2px solid var(--g300);border-color:var(--g500)}
+
+.btns{display:flex;gap:10px;flex-wrap:wrap}
+.btn{border:0;border-radius:10px;padding:11px 18px;font:inherit;font-weight:700;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:.15s}
+.btn-primary{background:var(--g600);color:#fff}
+.btn-primary:hover{background:var(--g700)}
+.btn-primary:disabled{background:var(--g200);cursor:not-allowed}
+.btn-ghost{background:var(--g100);color:var(--g800)}
+.btn-ghost:hover{background:var(--g200)}
+
+/* Mapping */
+.map-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+.map-grid label{font-size:13px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px}
+.req{color:var(--err)}
+.hidden{display:none!important}
+
+/* Stats */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+@media (max-width:860px){.stats{grid-template-columns:repeat(2,1fr)}}
+.stat{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:var(--shadow)}
+.stat .k{font-size:13px;color:var(--muted);font-weight:600}
+.stat .v{font-size:28px;font-weight:800;color:var(--g900);font-variant-numeric:tabular-nums}
+.stat.ok .v{color:var(--ok)} .stat.warn .v{color:var(--warn)} .stat.err .v{color:var(--err)}
+.sums{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px}
+@media (max-width:700px){.sums{grid-template-columns:1fr}}
+.sum{background:var(--g900);color:#fff;border-radius:14px;padding:16px}
+.sum .k{color:var(--g200);font-size:13px;font-weight:600}
+.sum .v{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums}
+
+/* Months */
+.months{display:grid;grid-template-columns:repeat(12,1fr);gap:8px;align-items:end;height:170px;padding-top:10px}
+@media (max-width:700px){.months{grid-template-columns:repeat(6,1fr);height:auto}}
+.mcol{display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end}
+.bar{width:100%;max-width:46px;background:linear-gradient(var(--g500),var(--g700));border-radius:8px 8px 3px 3px;min-height:3px;position:relative}
+.bar .e{position:absolute;left:0;right:0;bottom:0;background:var(--err);border-radius:0 0 3px 3px;opacity:.85}
+.mcol small{font-size:12px;color:var(--muted);font-weight:600}
+.mcol .cnt{font-size:12px;font-weight:700;color:var(--g800)}
+@media (max-width:700px){.bar{height:60px!important}}
+.legend{display:flex;gap:16px;font-size:13px;color:var(--muted);margin-top:10px}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+
+/* Table */
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-bottom:14px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:7px 14px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;color:var(--g800)}
+.chip.active{background:var(--g700);color:#fff;border-color:var(--g700)}
+.search{max-width:280px}
+.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:12px;max-height:620px}
+table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:980px}
+th{position:sticky;top:0;background:var(--g800);color:#fff;text-align:left;padding:10px;font-weight:700;white-space:nowrap;z-index:1}
+td{padding:9px 10px;border-top:1px solid var(--line);vertical-align:top}
+tbody tr:nth-child(even){background:var(--g50)}
+tr.r-err td:first-child{box-shadow:inset 4px 0 var(--err)}
+tr.r-warn td:first-child{box-shadow:inset 4px 0 var(--warn)}
+tr.r-ok td:first-child{box-shadow:inset 4px 0 var(--ok)}
+td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.pill{display:inline-block;padding:3px 10px;border-radius:999px;font-weight:700;font-size:12px;white-space:nowrap}
+.pill.ok{background:var(--ok-bg);color:var(--ok)} .pill.warn{background:var(--warn-bg);color:var(--warn)} .pill.err{background:var(--err-bg);color:var(--err)}
+.issues{margin:0;padding-left:16px}
+.issues li.err{color:var(--err)} .issues li.warn{color:var(--warn)}
+.empty{padding:30px;text-align:center;color:var(--muted)}
+
+.rules{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.rule{background:var(--g50);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:14px}
+.rule b{color:var(--g900)}
+footer{text-align:center;color:var(--muted);font-size:13px;padding:24px 16px 40px}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--g900);color:#fff;padding:12px 20px;border-radius:12px;font-weight:600;box-shadow:var(--shadow);opacity:0;transition:.25s;pointer-events:none;max-width:calc(100% - 32px)}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">
+        <div class="logo">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m9 15 2 2 4-4"/></svg>
+        </div>
+        Проверка счетов-фактур
+      </div>
+      <span class="badge-year">2026</span>
+    </div>
+    <h1>Проверка выставленных счетов-фактур за 2026 год</h1>
+    <p>Загрузите реестр в формате Excel — сервис проверит даты, номера, БИН/ИИН, расчёт НДС и итоговые суммы. Файл обрабатывается только в вашем браузере и никуда не отправляется.</p>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- Шаг 1 -->
+  <section class="card">
+    <h2><span class="step">1</span>Загрузка реестра</h2>
+    <p class="sub">Поддерживаются форматы .xlsx, .xls, .csv. Первая строка с заголовками определяется автоматически.</p>
+    <div class="grid-up">
+      <div>
+        <label class="drop" id="drop">
+          <input type="file" id="file" accept=".xlsx,.xls,.csv" hidden>
+          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg>
+          <b>Перетащите файл сюда или нажмите для выбора</b>
+          <span>Реестр выставленных счетов-фактур (Excel)</span>
+        </label>
+        <div class="file-info" id="fileInfo"></div>
+        <div class="btns" style="margin-top:8px">
+          <button class="btn btn-ghost" id="btnTemplate" type="button">⬇ Скачать шаблон Excel</button>
+          <button class="btn btn-ghost" id="btnDemo" type="button">▶ Загрузить демо-данные</button>
+        </div>
+      </div>
+      <div class="settings">
+        <div class="row">
+          <label for="sheet">Лист книги</label>
+          <select id="sheet" disabled><option>— файл не загружен —</option></select>
+        </div>
+        <div class="row">
+          <label for="year">Проверяемый год</label>
+          <input type="number" id="year" value="2026" min="2000" max="2100">
+        </div>
+        <div class="row">
+          <label for="rate">Ставка НДС по умолчанию, %</label>
+          <input type="number" id="rate" value="16" min="0" max="100" step="0.01">
+        </div>
+        <div class="row">
+          <label for="tol">Допустимое расхождение, ₸</label>
+          <input type="number" id="tol" value="1" min="0" step="0.01">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Шаг 2 -->
+  <section class="card hidden" id="mapCard">
+    <h2><span class="step">2</span>Сопоставление колонок</h2>
+    <p class="sub">Колонки определены автоматически — проверьте и при необходимости исправьте. <span class="req">*</span> — обязательные поля.</p>
+    <div class="map-grid" id="mapGrid"></div>
+    <div class="btns" style="margin-top:18px">
+      <button class="btn btn-primary" id="btnCheck" type="button">✔ Проверить счета-фактуры</button>
+    </div>
+  </section>
+
+  <!-- Результаты -->
+  <section id="results" class="hidden">
+    <div class="stats">
+      <div class="stat"><div class="k">Всего документов</div><div class="v" id="sTotal">0</div></div>
+      <div class="stat ok"><div class="k">Без замечаний</div><div class="v" id="sOk">0</div></div>
+      <div class="stat warn"><div class="k">С предупреждениями</div><div class="v" id="sWarn">0</div></div>
+      <div class="stat err"><div class="k">С ошибками</div><div class="v" id="sErr">0</div></div>
+    </div>
+    <div class="sums">
+      <div class="sum"><div class="k">Сумма без НДС</div><div class="v" id="sBase">0</div></div>
+      <div class="sum"><div class="k">Сумма НДС</div><div class="v" id="sVat">0</div></div>
+      <div class="sum"><div class="k">Сумма с НДС</div><div class="v" id="sGross">0</div></div>
+    </div>
+
+    <section class="card">
+      <h2><span class="step">3</span>Динамика по месяцам <span id="yLabel"></span></h2>
+      <p class="sub">Количество счетов-фактур по дате выписки. Красным — доля документов с ошибками.</p>
+      <div class="months" id="months"></div>
+      <div class="legend"><span><i style="background:var(--g600)"></i>Документы</span><span><i style="background:var(--err)"></i>С ошибками</span></div>
+    </section>
+
+    <section class="card">
+      <h2><span class="step">4</span>Результаты проверки</h2>
+      <div class="toolbar">
+        <div class="chips" id="chips">
+          <button class="chip active" data-f="all">Все</button>
+          <button class="chip" data-f="err">Ошибки</button>
+          <button class="chip" data-f="warn">Предупреждения</button>
+          <button class="chip" data-f="ok">Без замечаний</button>
+        </div>
+        <div class="btns">
+          <input type="text" class="search" id="search" placeholder="Поиск: номер, БИН, контрагент">
+          <button class="btn btn-primary" id="btnExport" type="button">⬇ Отчёт в Excel</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Стр.</th><th>Статус</th><th>№ СФ</th><th>Дата</th><th>БИН/ИИН</th><th>Контрагент</th>
+            <th>Без НДС</th><th>Ставка</th><th>НДС</th><th>С НДС</th><th>Замечания</th>
+          </tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </section>
+  </section>
+
+  <section class="card">
+    <h2>Какие проверки выполняются</h2>
+    <p class="sub">Ошибки (красные) требуют исправления, предупреждения (жёлтые) — внимания.</p>
+    <div class="rules">
+      <div class="rule"><b>Номер</b> — заполнен, без дубликатов в реестре.</div>
+      <div class="rule"><b>Дата</b> — корректна, относится к проверяемому году, не позже сегодняшнего дня.</div>
+      <div class="rule"><b>БИН/ИИН</b> — 12 цифр и верная контрольная сумма.</div>
+      <div class="rule"><b>Контрагент</b> — наименование заполнено.</div>
+      <div class="rule"><b>НДС</b> — равен «Сумма без НДС × ставка» с учётом допуска.</div>
+      <div class="rule"><b>Итог</b> — «Сумма с НДС» = «Без НДС» + «НДС».</div>
+      <div class="rule"><b>Суммы</b> — числовые, отрицательные помечаются как корректировка.</div>
+    </div>
+  </section>
+</main>
+
+<footer>Проверка счетов-фактур · 2026 · Данные обрабатываются локально в браузере</footer>
+<div class="toast" id="toast"></div>
+
+<script>
+const FIELDS = [
+  {key:'num',   label:'Номер счёта-фактуры', req:true},
+  {key:'date',  label:'Дата выписки',         req:true},
+  {key:'bin',   label:'БИН/ИИН покупателя',   req:true},
+  {key:'name',  label:'Наименование покупателя', req:false},
+  {key:'base',  label:'Сумма без НДС',        req:true},
+  {key:'rate',  label:'Ставка НДС, %',        req:false},
+  {key:'vat',   label:'Сумма НДС',            req:true},
+  {key:'total', label:'Сумма с НДС',          req:true},
+];
+const MONTHS = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+const $ = id => document.getElementById(id);
+
+let workbook = null, fileName = '', header = [], dataRows = [], headerRowIdx = 0, results = [], filter = 'all';
+
+/* ---------- helpers ---------- */
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),2600); }
+const fmt = n => (isFinite(n) ? n.toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—');
+const fmtDate = d => d ? d.toLocaleDateString('ru-RU') : '';
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const isEmpty = v => v === null || v === undefined || String(v).trim() === '';
+
+function guessField(h){
+  h = String(h).toLowerCase().replace(/\s+/g,' ').trim();
+  if(!h || /п\s*\/\s*п|^#$/.test(h)) return null;
+  if(/без\s*ндс/.test(h)) return 'base';
+  if(/ставк/.test(h)) return 'rate';
+  if(/с\s*(учет\S*\s*)?ндс|итого|всего/.test(h)) return 'total';
+  if(/ндс|vat/.test(h)) return 'vat';
+  if(/бин|иин|\bbin\b/.test(h)) return 'bin';
+  if(/дата|date/.test(h)) return 'date';
+  if(/номер|№|number|^no\b/.test(h)) return 'num';
+  if(/контрагент|покупател|получател|наименован|клиент/.test(h)) return 'name';
+  return null;
+}
+
+function parseNum(v){
+  if(typeof v === 'number') return v;
+  if(isEmpty(v)) return NaN;
+  let s = String(v).replace(/[\s ₸]/g,'').replace(/[^\d,.\-]/g,'');
+  if(!s) return NaN;
+  if(s.includes(',') && s.includes('.')) s = s.replace(/,/g,''); else s = s.replace(',', '.');
+  const n = Number(s);
+  return isNaN(n) ? NaN : n;
+}
+
+function parseDate(v){
+  if(v instanceof Date && !isNaN(v)) return v;
+  if(typeof v === 'number' && v > 20000 && v < 80000){
+    const d = XLSX.SSF.parse_date_code(v); return new Date(d.y, d.m-1, d.d);
+  }
+  if(typeof v === 'string'){
+    const s = v.trim(); let m = s.match(/^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{2,4})/);
+    if(m){ let y=+m[3]; if(y<100) y+=2000; const d=new Date(y,+m[2]-1,+m[1]); if(d.getMonth()===+m[2]-1 && d.getDate()===+m[1]) return d; return null; }
+    m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if(m){ const d=new Date(+m[1],+m[2]-1,+m[3]); if(d.getMonth()===+m[2]-1) return d; }
+  }
+  return null;
+}
+
+function normBin(v){
+  if(isEmpty(v)) return '';
+  if(typeof v === 'number') return String(Math.round(v)).padStart(12,'0'); // ведущие нули, потерянные Excel
+  return String(v).replace(/\s/g,'');
+}
+
+/* Контрольная сумма БИН/ИИН (РК) */
+function binCheckDigit(d){
+  let s=0; for(let i=0;i<11;i++) s += d[i]*(i+1);
+  let c = s % 11;
+  if(c === 10){ s=0; for(let i=0;i<11;i++) s += d[i]*(((i+2)%11)+1); c = s % 11; if(c === 10) return -1; }
+  return c;
+}
+function binValid(b){
+  if(!/^\d{12}$/.test(b)) return false;
+  const d=[...b].map(Number); const c=binCheckDigit(d);
+  return c >= 0 && c === d[11];
+}
+
+/* ---------- loading ---------- */
+function loadWorkbook(wb, name){
+  workbook = wb; fileName = name;
+  const sel = $('sheet'); sel.innerHTML=''; sel.disabled=false;
+  wb.SheetNames.forEach(n => sel.add(new Option(n,n)));
+  $('fileInfo').textContent = '📄 ' + name;
+  loadSheet(wb.SheetNames[0]);
+}
+
+function loadSheet(name){
+  const rows = XLSX.utils.sheet_to_json(workbook.Sheets[name], {header:1, raw:true, defval:''});
+  // поиск строки заголовков: первая из 15 строк с максимумом распознанных колонок
+  let best = 0, bestScore = -1;
+  for(let i=0;i<Math.min(rows.length,15);i++){
+    const score = new Set(rows[i].map(guessField).filter(Boolean)).size;
+    if(score > bestScore){ bestScore = score; best = i; }
+  }
+  headerRowIdx = best;
+  header = (rows[best] || []).map((h,i) => String(h).trim() || ('Колонка ' + (i+1)));
+  dataRows = rows.slice(best+1).filter(r => r.some(c => !isEmpty(c)));
+  buildMapping();
+  $('mapCard').classList.remove('hidden');
+  $('results').classList.add('hidden');
+  toast(`Найдено строк: ${dataRows.length}`);
+}
+
+function buildMapping(){
+  const used = {};
+  header.forEach((h,i) => { const f = guessField(h); if(f && used[f] === undefined) used[f] = i; });
+  $('mapGrid').innerHTML = FIELDS.map(f => `
+    <div><label>${f.label}${f.req?' <span class="req">*</span>':''}</label>
+    <select data-key="${f.key}"><option value="">— не выбрано —</option>
+    ${header.map((h,i)=>`<option value="${i}" ${used[f.key]===i?'selected':''}>${esc(h)}</option>`).join('')}
+    </select></div>`).join('');
+}
+
+function readFile(file){
+  const r = new FileReader();
+  r.onload = e => {
+    try { loadWorkbook(XLSX.read(new Uint8Array(e.target.result), {type:'array'}), file.name); }
+    catch(err){ toast('Не удалось прочитать файл: ' + err.message); }
+  };
+  r.readAsArrayBuffer(file);
+}
+
+/* ---------- validation ---------- */
+function runCheck(){
+  const map = {};
+  document.querySelectorAll('#mapGrid select').forEach(s => { if(s.value !== '') map[s.dataset.key] = +s.value; });
+  const missing = FIELDS.filter(f => f.req && map[f.key] === undefined).map(f => f.label);
+  if(missing.length){ toast('Укажите колонки: ' + missing.join(', ')); return; }
+
+  const year = +$('year').value || 2026, defRate = +$('rate').value, tol = +$('tol').value || 0;
+  const today = new Date(); today.setHours(23,59,59,999);
+  const get = (r,k) => map[k] === undefined ? '' : r[map[k]];
+
+  const recs = dataRows.map((r,i) => {
+    const rateRaw = get(r,'rate');
+    let rate = isEmpty(rateRaw) ? defRate : parseNum(rateRaw);
+    if(isFinite(rate) && rate > 0 && rate < 1) rate = rate * 100; // 0.16 → 16
+    return {
+      line: headerRowIdx + i + 2, raw: r,
+      num: String(get(r,'num') ?? '').trim(),
+      dateRaw: get(r,'date'), date: parseDate(get(r,'date')),
+      bin: normBin(get(r,'bin')),
+      name: String(get(r,'name') ?? '').trim(),
+      base: parseNum(get(r,'base')), vat: parseNum(get(r,'vat')), total: parseNum(get(r,'total')),
+      baseRaw: get(r,'base'), vatRaw: get(r,'vat'), totalRaw: get(r,'total'),
+      rate, issues: []
+    };
+  });
+
+  const counts = {};
+  recs.forEach(x => { if(x.num){ const k = x.num.toLowerCase(); counts[k] = (counts[k]||0)+1; } });
+
+  recs.forEach(x => {
+    const E = m => x.issues.push({lvl:'err', m}), W = m => x.issues.push({lvl:'warn', m});
+    // номер
+    if(!x.num) E('Не указан номер счёта-фактуры');
+    else if(counts[x.num.toLowerCase()] > 1) E(`Дубликат номера (встречается ${counts[x.num.toLowerCase()]} раз)`);
+    // дата
+    if(isEmpty(x.dateRaw)) E('Не указана дата');
+    else if(!x.date) E('Некорректная дата: ' + x.dateRaw);
+    else {
+      if(x.date.getFullYear() !== year) E(`Дата вне ${year} года`);
+      else if(x.date > today) W('Дата в будущем');
+    }
+    // БИН
+    if(!x.bin) E('Не указан БИН/ИИН');
+    else if(!/^\d{12}$/.test(x.bin)) E('БИН/ИИН должен содержать 12 цифр');
+    else if(!binValid(x.bin)) W('Неверная контрольная сумма БИН/ИИН');
+    // контрагент
+    if(map.name !== undefined && !x.name) W('Не указано наименование покупателя');
+    // суммы
+    const amounts = [['Сумма без НДС',x.base,x.baseRaw],['Сумма НДС',x.vat,x.vatRaw],['Сумма с НДС',x.total,x.totalRaw]];
+    let numsOk = true;
+    amounts.forEach(([l,v,raw]) => {
+      if(isEmpty(raw)){ E(`Не заполнено: ${l}`); numsOk=false; }
+      else if(!isFinite(v)){ E(`Нечисловое значение: ${l}`); numsOk=false; }
+    });
+    if(!isFinite(x.rate)) { E('Некорректная ставка НДС'); numsOk=false; }
+    if(numsOk){
+      if(x.base < 0 || x.total < 0) W('Отрицательная сумма — проверьте, корректировочный ли это СФ');
+      const expVat = Math.round(x.base * x.rate) / 100;
+      if(Math.abs(expVat - x.vat) > tol) E(`НДС не соответствует ставке ${x.rate}%: ожидается ${fmt(expVat)}, указано ${fmt(x.vat)}`);
+      if(Math.abs(x.base + x.vat - x.total) > tol) E(`Сумма с НДС ≠ без НДС + НДС: ожидается ${fmt(x.base + x.vat)}`);
+    }
+    x.status = x.issues.some(i=>i.lvl==='err') ? 'err' : x.issues.length ? 'warn' : 'ok';
+  });
+
+  results = recs;
+  renderResults(year);
+  $('results').classList.remove('hidden');
+  $('results').scrollIntoView({behavior:'smooth'});
+}
+
+/* ---------- render ---------- */
+function renderResults(year){
+  const c = {ok:0,warn:0,err:0}; let sb=0, sv=0, st=0;
+  const mon = Array.from({length:12}, () => ({n:0,e:0}));
+  results.forEach(x => {
+    c[x.status]++;
+    if(isFinite(x.base)) sb += x.base; if(isFinite(x.vat)) sv += x.vat; if(isFinite(x.total)) st += x.total;
+    if(x.date && x.date.getFullYear() === year){ mon[x.date.getMonth()].n++; if(x.status==='err') mon[x.date.getMonth()].e++; }
+  });
+  $('sTotal').textContent = results.length; $('sOk').textContent = c.ok; $('sWarn').textContent = c.warn; $('sErr').textContent = c.err;
+  $('sBase').textContent = fmt(sb) + ' ₸'; $('sVat').textContent = fmt(sv) + ' ₸'; $('sGross').textContent = fmt(st) + ' ₸';
+  $('yLabel').textContent = year;
+
+  const max = Math.max(1, ...mon.map(m=>m.n));
+  $('months').innerHTML = mon.map((m,i) => `
+    <div class="mcol" title="${MONTHS[i]}: ${m.n} док., ошибок ${m.e}">
+      <span class="cnt">${m.n||''}</span>
+      <div class="bar" style="height:${Math.max(2, m.n/max*120)}px"><div class="e" style="height:${m.n? m.e/m.n*100:0}%"></div></div>
+      <small>${MONTHS[i]}</small>
+    </div>`).join('');
+  renderTable();
+}
+
+function renderTable(){
+  const q = $('search').value.trim().toLowerCase();
+  const label = {ok:'Без замечаний', warn:'Предупреждение', err:'Ошибка'};
+  const rows = results.filter(x => (filter==='all' || x.status===filter) &&
+    (!q || [x.num, x.bin, x.name].some(v => v.toLowerCase().includes(q))));
+  $('tbody').innerHTML = rows.length ? rows.map(x => `
+    <tr class="r-${x.status}">
+      <td>${x.line}</td>
+      <td><span class="pill ${x.status}">${label[x.status]}</span></td>
+      <td>${esc(x.num)}</td>
+      <td>${x.date ? fmtDate(x.date) : esc(x.dateRaw)}</td>
+      <td>${esc(x.bin)}</td>
+      <td>${esc(x.name)}</td>
+      <td class="n">${fmt(x.base)}</td>
+      <td class="n">${isFinite(x.rate)? x.rate+'%' : '—'}</td>
+      <td class="n">${fmt(x.vat)}</td>
+      <td class="n">${fmt(x.total)}</td>
+      <td>${x.issues.length ? '<ul class="issues">'+x.issues.map(i=>`<li class="${i.lvl}">${esc(i.m)}</li>`).join('')+'</ul>' : '<span style="color:var(--ok)">✔</span>'}</td>
+    </tr>`).join('') : '<tr><td colspan="11" class="empty">Нет строк, соответствующих фильтру</td></tr>';
+}
+
+/* ---------- export ---------- */
+function exportReport(){
+  if(!results.length) return;
+  const label = {ok:'Без замечаний', warn:'Предупреждение', err:'Ошибка'};
+  const detail = results.map(x => {
+    const o = {'Строка': x.line, 'Статус': label[x.status]};
+    header.forEach((h,i) => o[h] = x.raw[i]);
+    o['Замечания'] = x.issues.map(i => (i.lvl==='err'?'[Ошибка] ':'[Предупр.] ') + i.m).join('; ');
+    return o;
+  });
+  const c = {ok:0,warn:0,err:0}; results.forEach(x=>c[x.status]++);
+  const summary = [
+    ['Отчёт о проверке счетов-фактур'], ['Файл', fileName], ['Дата проверки', new Date().toLocaleString('ru-RU')],
+    ['Проверяемый год', +$('year').value], ['Ставка НДС по умолчанию, %', +$('rate').value], [],
+    ['Всего документов', results.length], ['Без замечаний', c.ok], ['С предупреждениями', c.warn], ['С ошибками', c.err], [],
+    ['Сумма без НДС', results.reduce((s,x)=>s+(isFinite(x.base)?x.base:0),0)],
+    ['Сумма НДС', results.reduce((s,x)=>s+(isFinite(x.vat)?x.vat:0),0)],
+    ['Сумма с НДС', results.reduce((s,x)=>s+(isFinite(x.total)?x.total:0),0)],
+  ];
+  const wb = XLSX.utils.book_new();
+  const ws1 = XLSX.utils.aoa_to_sheet(summary); ws1['!cols'] = [{wch:30},{wch:40}];
+  const ws2 = XLSX.utils.json_to_sheet(detail);
+  ws2['!cols'] = Object.keys(detail[0]).map(k => ({wch: k==='Замечания' ? 80 : Math.max(10, k.length+2)}));
+  ws2['!autofilter'] = {ref: ws2['!ref']};
+  XLSX.utils.book_append_sheet(wb, ws1, 'Сводка');
+  XLSX.utils.book_append_sheet(wb, ws2, 'Результаты');
+  const errs = detail.filter((_,i) => results[i].status !== 'ok');
+  if(errs.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(errs), 'Замечания');
+  XLSX.writeFile(wb, 'Отчет_проверки_СФ_' + new Date().toISOString().slice(0,10) + '.xlsx');
+}
+
+/* ---------- template & demo ---------- */
+const HEAD = ['№ п/п','Номер СФ','Дата выписки','БИН/ИИН покупателя','Наименование покупателя','Сумма без НДС','Ставка НДС, %','Сумма НДС','Сумма с НДС'];
+function makeBin(prefix11){
+  const d = [...prefix11].map(Number); const c = binCheckDigit(d);
+  return c < 0 ? null : prefix11 + c;
+}
+function validBin(seed){ for(let k=0;;k++){ const b = makeBin(String(seed + k).padStart(11,'0').slice(-11)); if(b) return b; } }
+
+function demoRows(){
+  const b1 = validBin(26040000123), b2 = validBin(15030000456), b3 = validBin(990740000789), b4 = validBin(18120001010);
+  const row = (n, num, d, bin, name, base, rate=16, vat, tot) => {
+    vat = vat ?? Math.round(base*rate)/100; tot = tot ?? +(base+vat).toFixed(2);
+    return [n, num, d, bin, name, base, rate, vat, tot];
+  };
+  return [
+    row(1,'СФ-2026-0001','15.01.2026',b1,'ТОО «Каспий Сервис»',1250000),
+    row(2,'СФ-2026-0002','28.01.2026',b2,'АО «Степь Логистик»',870500.50),
+    row(3,'СФ-2026-0003','10.02.2026',b3,'ТОО «Атырау Нефтемаш»',2340000),
+    row(4,'СФ-2026-0004','03.03.2026',b1,'ТОО «Каспий Сервис»',560000, 16, 67200),          // неверный НДС
+    row(5,'СФ-2026-0005','21.03.2026',b4,'ТОО «Жетысу Трейд»',415000),
+    row(6,'СФ-2026-0006','30.12.2025',b2,'АО «Степь Логистик»',300000),                    // не 2026 год
+    row(7,'СФ-2026-0007','14.04.2026','12345678901','ИП Сериков',90000),                    // 11 цифр
+    row(8,'СФ-2026-0008','05.05.2026',b3,'',1800000),                                       // нет наименования
+    row(9,'СФ-2026-0008','19.05.2026',b4,'ТОО «Жетысу Трейд»',220000),                      // дубликат номера
+    row(10,'СФ-2026-0010','02.06.2026',b1,'ТОО «Каспий Сервис»',980000, 16, undefined, 1130000), // итог не сходится
+    row(11,'СФ-2026-0011','17.07.2026',b2,'АО «Степь Логистик»',1475000),
+    row(12,'СФ-2026-0012','08.08.2026','123456789012','ТОО «Новый Партнёр»',640000),        // контрольная сумма
+    row(13,'СФ-2026-0013','26.09.2026',b3,'ТОО «Атырау Нефтемаш»',3100000),
+    row(14,'СФ-2026-0014','06.10.2026',b4,'ТОО «Жетысу Трейд»',-120000),                    // корректировка
+  ];
+}
+
+function downloadTemplate(){
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet([HEAD, ...demoRows().slice(0,3)]);
+  ws['!cols'] = [{wch:7},{wch:16},{wch:14},{wch:20},{wch:30},{wch:16},{wch:14},{wch:14},{wch:16}];
+  XLSX.utils.book_append_sheet(wb, ws, 'Реестр СФ 2026');
+  XLSX.writeFile(wb, 'Шаблон_реестра_СФ_2026.xlsx');
+}
+
+function loadDemo(){
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([HEAD, ...demoRows()]), 'Реестр СФ 2026');
+  loadWorkbook(wb, 'Демо-реестр 2026.xlsx');
+  runCheck();
+}
+
+/* ---------- events ---------- */
+const drop = $('drop');
+$('file').addEventListener('change', e => e.target.files[0] && readFile(e.target.files[0]));
+['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => e.dataTransfer.files[0] && readFile(e.dataTransfer.files[0]));
+$('sheet').addEventListener('change', e => loadSheet(e.target.value));
+$('btnCheck').addEventListener('click', runCheck);
+$('btnExport').addEventListener('click', exportReport);
+$('btnTemplate').addEventListener('click', downloadTemplate);
+$('btnDemo').addEventListener('click', loadDemo);
+$('search').addEventListener('input', renderTable);
+$('chips').addEventListener('click', e => {
+  const b = e.target.closest('.chip'); if(!b) return;
+  document.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c===b));
+  filter = b.dataset.f; renderTable();
+});
+['year','rate','tol'].forEach(id => $(id).addEventListener('change', () => { if(results.length) runCheck(); }));
+</script>
+</body>
+</html>
